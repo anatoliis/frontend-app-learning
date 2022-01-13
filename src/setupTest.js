@@ -25,6 +25,7 @@ import appMessages from './i18n';
 import { fetchCourse, fetchSequence } from './courseware/data';
 import { appendBrowserTimezoneToUrl, executeThunk } from './utils';
 import buildSimpleCourseAndSequenceMetadata from './courseware/data/__factories__/sequenceMetadata.factory';
+import { buildOutlineFromBlocks } from './courseware/data/__factories__/learningSequencesOutline.factory';
 
 class MockLoggingService {
   logInfo = jest.fn();
@@ -149,15 +150,13 @@ export async function initializeTestStore(options = {}, overrideStore = true) {
     courseBlocks, sequenceBlocks, courseMetadata, sequenceMetadata,
   } = buildSimpleCourseAndSequenceMetadata(options);
 
-  let forbiddenCourseUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseMetadata.id}`;
-  forbiddenCourseUrl = appendBrowserTimezoneToUrl(forbiddenCourseUrl);
+  let courseMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course/${courseMetadata.id}`;
+  courseMetadataUrl = appendBrowserTimezoneToUrl(courseMetadataUrl);
 
-  const courseBlocksUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`);
   const learningSequencesUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/learning_sequences/v1/course_outline/*`);
 
-  axiosMock.onGet(forbiddenCourseUrl).reply(200, courseMetadata);
-  axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
-  axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
+  axiosMock.onGet(courseMetadataUrl).reply(200, courseMetadata);
+  axiosMock.onGet(learningSequencesUrlRegExp).reply(200, buildOutlineFromBlocks(courseBlocks));
   sequenceMetadata.forEach(metadata => {
     const sequenceMetadataUrl = `${getConfig().LMS_BASE_URL}/api/courseware/sequence/${metadata.item_id}`;
     axiosMock.onGet(sequenceMetadataUrl).reply(200, metadata);
@@ -172,7 +171,7 @@ export async function initializeTestStore(options = {}, overrideStore = true) {
 
   if (!options.excludeFetchSequence) {
     await Promise.all(sequenceBlocks
-      .map(block => executeThunk(fetchSequence(block.id), store.dispatch)));
+      .map(block => executeThunk(fetchSequence(courseMetadata.id, block.id), store.dispatch)));
   }
 
   return store;

@@ -19,7 +19,6 @@ const axiosMock = new MockAdapter(getAuthenticatedHttpClient());
 
 describe('Data layer integration tests', () => {
   const courseBaseUrl = `${getConfig().LMS_BASE_URL}/api/courseware/course`;
-  const courseBlocksUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/courses/v2/blocks/*`);
   const learningSequencesUrlRegExp = new RegExp(`${getConfig().LMS_BASE_URL}/api/learning_sequences/v1/course_outline/*`);
   const sequenceBaseUrl = `${getConfig().LMS_BASE_URL}/api/courseware/sequence`;
 
@@ -53,7 +52,6 @@ describe('Data layer integration tests', () => {
   describe('Test fetchCourse', () => {
     it('Should fail to fetch course and blocks if request error happens', async () => {
       axiosMock.onGet(courseUrl).networkError();
-      axiosMock.onGet(courseBlocksUrlRegExp).networkError();
       axiosMock.onGet(learningSequencesUrlRegExp).networkError();
 
       await executeThunk(thunks.fetchCourse(courseId), store.dispatch);
@@ -78,8 +76,7 @@ describe('Data layer integration tests', () => {
       forbiddenCourseUrl = appendBrowserTimezoneToUrl(forbiddenCourseUrl);
 
       axiosMock.onGet(forbiddenCourseUrl).reply(200, forbiddenCourseMetadata);
-      axiosMock.onGet(courseBlocksUrlRegExp).reply(200, forbiddenCourseBlocks);
-      axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
+      axiosMock.onGet(learningSequencesUrlRegExp).reply(200, buildOutlineFromBlocks(forbiddenCourseBlocks));
 
       await executeThunk(thunks.fetchCourse(forbiddenCourseMetadata.id), store.dispatch);
 
@@ -93,8 +90,7 @@ describe('Data layer integration tests', () => {
 
     it('Should fetch, normalize, and save metadata', async () => {
       axiosMock.onGet(courseUrl).reply(200, courseMetadata);
-      axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
-      axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
+      axiosMock.onGet(learningSequencesUrlRegExp).reply(200, buildOutlineFromBlocks(courseBlocks));
 
       await executeThunk(thunks.fetchCourse(courseId), store.dispatch);
 
@@ -113,7 +109,6 @@ describe('Data layer integration tests', () => {
       // Very similar to previous test, but pass back an outline for filtering
       // (even though it won't actually filter down in this case).
       axiosMock.onGet(courseUrl).reply(200, courseMetadata);
-      axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
       axiosMock.onGet(learningSequencesUrlRegExp).reply(200, simpleOutline);
 
       await executeThunk(thunks.fetchCourse(courseId), store.dispatch);
@@ -136,7 +131,6 @@ describe('Data layer integration tests', () => {
       // Very similar to previous test, but pass back an outline for filtering
       // (even though it won't actually filter down in this case).
       axiosMock.onGet(courseUrl).reply(200, courseMetadata);
-      axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
 
       // Create an outline with basic matching metadata, but then empty it out...
       const emptyOutline = buildOutlineFromBlocks(courseBlocks);
@@ -164,7 +158,7 @@ describe('Data layer integration tests', () => {
     it('Should result in fetch failure if error occurs', async () => {
       axiosMock.onGet(sequenceUrl).networkError();
 
-      await executeThunk(thunks.fetchSequence(sequenceId), store.dispatch);
+      await executeThunk(thunks.fetchSequence(courseId, sequenceId), store.dispatch);
 
       expect(loggingService.logError).toHaveBeenCalled();
       expect(store.getState().courseware.sequenceStatus).toEqual('failed');
@@ -180,7 +174,7 @@ describe('Data layer integration tests', () => {
       };
       axiosMock.onGet(sequenceUrl).reply(200, sectionMetadata);
 
-      await executeThunk(thunks.fetchSequence(sequenceId), store.dispatch);
+      await executeThunk(thunks.fetchSequence(courseId, sequenceId), store.dispatch);
 
       expect(loggingService.logError).toHaveBeenCalled();
       expect(store.getState().courseware.sequenceStatus).toEqual('failed');
@@ -188,8 +182,7 @@ describe('Data layer integration tests', () => {
 
     it('Should fetch and normalize metadata, and then update existing models with sequence metadata', async () => {
       axiosMock.onGet(courseUrl).reply(200, courseMetadata);
-      axiosMock.onGet(courseBlocksUrlRegExp).reply(200, courseBlocks);
-      axiosMock.onGet(learningSequencesUrlRegExp).reply(403, {});
+      axiosMock.onGet(learningSequencesUrlRegExp).reply(200, buildOutlineFromBlocks(courseBlocks));
       axiosMock.onGet(sequenceUrl).reply(200, sequenceMetadata);
 
       // setting course with blocks before sequence to check that blocks receive
@@ -204,12 +197,6 @@ describe('Data layer integration tests', () => {
           activeUnitIndex: expect.any(Number),
         }),
       });
-      expect(state.models.units).toEqual({
-        [unitId]: expect.not.objectContaining({
-          complete: null,
-          bookmarked: expect.any(Boolean),
-        }),
-      });
 
       // Update our state variable again.
       state = store.getState();
@@ -219,7 +206,7 @@ describe('Data layer integration tests', () => {
       expect(state.courseware.sequenceStatus).toEqual('loading');
       expect(state.courseware.sequenceId).toEqual(null);
 
-      await executeThunk(thunks.fetchSequence(sequenceId), store.dispatch);
+      await executeThunk(thunks.fetchSequence(courseId, sequenceId), store.dispatch);
 
       // Update our state variable again.
       state = store.getState();
@@ -250,7 +237,7 @@ describe('Data layer integration tests', () => {
       // thunks tested in this block rely on fact, that store already has
       // some info about sequence
       axiosMock.onGet(sequenceUrl).reply(200, sequenceMetadata);
-      await executeThunk(thunks.fetchSequence(sequenceMetadata.item_id), store.dispatch);
+      await executeThunk(thunks.fetchSequence(courseId, sequenceMetadata.item_id), store.dispatch);
     });
 
     describe('Test checkBlockCompletion', () => {

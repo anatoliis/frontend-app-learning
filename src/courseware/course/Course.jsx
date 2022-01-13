@@ -48,7 +48,7 @@ function Course({
   const dispatch = useDispatch();
   const celebrateFirstSection = celebrations && celebrations.firstSection;
   const celebrationOpen = shouldCelebrateOnSectionLoad(
-    courseId, sequenceId, unitId, celebrateFirstSection, dispatch, celebrations,
+    courseId, sequenceId, celebrateFirstSection, dispatch, celebrations,
   );
 
   // Responsive breakpoints for showing the notification button/tray
