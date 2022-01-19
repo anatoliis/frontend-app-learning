@@ -19,6 +19,7 @@ import { getLocalStorage, setLocalStorage } from '../../data/localStorage';
 
 /** [MM-P2P] Experiment */
 import { initCoursewareMMP2P, MMP2PBlockModal } from '../../experiments/mm-p2p';
+import InCourseOutlineTab from "../../course-home/outline-tab/InCourseOutlineTab";
 
 function Course({
   courseId,
@@ -108,6 +109,7 @@ function Course({
       </div>
 
       <AlertList topic="sequence" />
+      <InCourseOutlineTab/>
       <Sequence
         unitId={unitId}
         sequenceId={sequenceId}
